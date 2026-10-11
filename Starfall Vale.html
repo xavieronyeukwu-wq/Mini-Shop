@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#172e36">
+  <title>Starfall Vale</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: #f5edcf;
+      background: #172e36;
+      --ink: #172e36;
+      --paper: #f5edcf;
+      --mint: #9dd17b;
+      --coral: #e77c61;
+      --gold: #f3c960;
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      background:
+        radial-gradient(ellipse at 50% 0%, rgba(92, 147, 119, .26), transparent 55%),
+        linear-gradient(145deg, #18343c, #1b292e 72%);
+    }
+    .page { width: min(1020px, 100%); margin: 0 auto; }
+    .topbar { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 0 2px 12px; }
+    .eyebrow { margin: 0 0 4px; color: var(--mint); font-size: 10px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
+    h1 { margin: 0; color: var(--paper); font-size: clamp(25px, 5vw, 38px); font-weight: 1000; line-height: 1; text-transform: uppercase; }
+    .record { padding: 8px 12px; border: 2px solid #607b6d; background: #243d40; color: #bed1b3; font-size: 11px; font-weight: 900; white-space: nowrap; }
+    .record strong { color: var(--gold); }
+    .game-frame { position: relative; overflow: hidden; width: 100%; border: 3px solid #d3d5b8; background: #75bd63; box-shadow: 0 14px 36px rgba(0,0,0,.26); isolation: isolate; }
+    canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; }
+    .hud { position: absolute; z-index: 2; top: 12px; left: 12px; display: flex; gap: 6px; pointer-events: none; }
+    .stat { min-width: 69px; padding: 6px 9px; border: 2px solid var(--ink); background: rgba(245,237,207,.96); color: var(--ink); box-shadow: 2px 2px 0 rgba(23,46,54,.7); }
+    .stat-label { display: block; color: #567065; font-size: 8px; font-weight: 1000; letter-spacing: 1px; }
+    .stat output { display: block; color: var(--ink); font-size: 16px; font-weight: 1000; line-height: 1.1; }
+    .toast { position: absolute; z-index: 2; top: 13px; left: 50%; max-width: 72%; padding: 7px 12px; transform: translateX(-50%); border: 2px solid var(--ink); background: var(--paper); color: var(--ink); font-size: 12px; font-weight: 900; text-align: center; pointer-events: none; opacity: 0; transition: opacity .14s ease; }
+    .toast.visible { opacity: 1; }
+    .touch-controls { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 2px 0; }
+    .dpad { display: grid; grid-template: repeat(2, 46px) / repeat(3, 46px); gap: 4px; }
+    .dpad button:nth-child(1) { grid-column: 2; grid-row: 1; }
+    .dpad button:nth-child(2) { grid-column: 1; grid-row: 2; }
+    .dpad button:nth-child(3) { grid-column: 2; grid-row: 2; }
+    .dpad button:nth-child(4) { grid-column: 3; grid-row: 2; }
+    .actions { display: flex; align-items: center; gap: 9px; }
+    button { min-width: 48px; min-height: 46px; padding: 0 12px; border: 2px solid #d3d5b8; border-radius: 0; background: #304b4c; color: var(--paper); font: inherit; font-size: 16px; font-weight: 1000; cursor: pointer; touch-action: none; user-select: none; }
+    button:active, button.held { transform: translateY(2px); background: #476b59; }
+    button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+    #attack { min-width: 76px; background: #a84e43; border-color: #f0b083; color: #fff2d8; }
+    #interact { min-width: 76px; background: #a77834; border-color: #f4d27a; color: #fff2d8; }
+    .end-panel { position: absolute; z-index: 4; inset: 0; display: grid; align-content: center; justify-items: center; gap: 12px; background: rgba(14,32,38,.84); color: var(--paper); text-align: center; }
+    .end-panel[hidden] { display: none; }
+    .end-panel h2 { margin: 0; font-size: clamp(32px, 8vw, 60px); line-height: 1; text-transform: uppercase; }
+    .end-panel p { max-width: 80%; margin: 0; font-size: 15px; font-weight: 700; }
+    .end-panel button { min-width: 135px; margin-top: 4px; border-color: var(--gold); background: #d2a83c; color: var(--ink); }
+    @media (max-width: 600px) {
+      body { padding: 12px; }
+      .topbar { align-items: center; margin-bottom: 9px; }
+      .eyebrow { font-size: 8px; }
+      .record { padding: 6px 8px; font-size: 9px; }
+      .game-frame { border-width: 2px; }
+      .hud { top: 7px; left: 7px; gap: 4px; }
+      .stat { min-width: 54px; padding: 4px 6px; }
+      .stat-label { font-size: 7px; }
+      .stat output { font-size: 14px; }
+      .toast { top: 8px; left: auto; right: 7px; max-width: 42%; padding: 5px 7px; transform: none; font-size: 10px; }
+      .touch-controls { padding-top: 10px; }
+      .dpad { grid-template: repeat(2, 42px) / repeat(3, 42px); gap: 3px; }
+      .actions { gap: 6px; }
+      button { min-width: 42px; min-height: 44px; padding: 0 8px; }
+      #attack, #interact { min-width: 61px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div><p class="eyebrow">A pixel adventure</p><h1>Starfall Vale</h1></div>
+      <div class="record">BEST <strong id="best">0</strong></div>
+    </header>
+    <section class="game-frame" aria-label="Starfall Vale adventure game">
+      <canvas id="game" width="320" height="200"></canvas>
+      <div class="hud" aria-live="polite">
+        <div class="stat"><span class="stat-label">HEARTS</span><output id="hearts">♥ ♥ ♥ ♥</output></div>
+        <div class="stat"><span class="stat-label">STAR SHARDS</span><output id="shards">0 / 3</output></div>
+        <div class="stat"><span class="stat-label">SCORE</span><output id="score">0</output></div>
+      </div>
+      <div id="toast" class="toast" role="status"></div>
+      <div id="end-panel" class="end-panel" hidden>
+        <h2 id="end-title">Vale restored</h2>
+        <p id="end-copy">The star shrine shines again.</p>
+        <button id="play-again">PLAY AGAIN</button>
+      </div>
+    </section>
+    <nav class="touch-controls" aria-label="Game controls">
+      <div class="dpad">
+        <button data-hold="up" aria-label="Move up">↑</button>
+        <button data-hold="left" aria-label="Move left">←</button>
+        <button data-hold="down" aria-label="Move down">↓</button>
+        <button data-hold="right" aria-label="Move right">→</button>
+      </div>
+      <div class="actions">
+        <button id="interact" aria-label="Use shrine">USE</button>
+        <button id="attack" aria-label="Attack">SWORD</button>
+      </div>
+    </nav>
+  </main>
+  <script>
+    (() => {
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d");
+      const TILE = 16;
+      const WORLD_COLS = 60;
+      const WORLD_ROWS = 40;
+      const WORLD_W = WORLD_COLS * TILE;
+      const WORLD_H = WORLD_ROWS * TILE;
+      const view = { x: 0, y: 0 };
+      const held = { up: false, down: false, left: false, right: false };
+      const keys = new Set();
+      const player = { x: 5 * TILE, y: 24 * TILE, w: 11, h: 12, face: "down", speed: 88, invulnerable: 0, attack: 0, attackCooldown: 0 };
+      const relics = [
+        { x: 16 * TILE + 8, y: 21 * TILE + 8, found: false },
+        { x: 32 * TILE + 8, y: 27 * TILE + 8, found: false },
+        { x: 46 * TILE + 8, y: 20 * TILE + 8, found: false },
+      ];
+      const enemies = [
+        { x: 22 * TILE, y: 24 * TILE, hp: 2, alive: true, phase: 0 },
+        { x: 36 * TILE, y: 22 * TILE, hp: 2, alive: true, phase: 2 },
+        { x: 43 * TILE, y: 27 * TILE, hp: 2, alive: true, phase: 4 },
+        { x: 50 * TILE, y: 22 * TILE, hp: 2, alive: true, phase: 1 },
+      ];
+      const ponds = [
+        { x: 11, y: 8, w: 6, h: 4 },
+        { x: 29, y: 6, w: 6, h: 4 },
+        { x: 37, y: 32, w: 6, h: 4 },
+        { x: 5, y: 30, w: 5, h: 4 },
+      ];
+      const cabins = [{ x: 5, y: 16 }];
+      const trees = [];
+      const game = { hearts: 4, score: 0, time: 0, won: false, over: false, toastTime: 0 };
+      let best = Number(localStorage.getItem("starfall-vale-best") || 0);
+      document.getElementById("best").textContent = best;
+
+      function hash(x, y) {
+        let n = Math.imul(x + 31, 374761393) + Math.imul(y + 17, 668265263);
+        n = Math.imul(n ^ (n >>> 13), 1274126177);
+        return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+      }
+      function inPath(tx, ty) {
+        return (ty >= 23 && ty <= 25 && tx >= 2 && tx <= 58) || (tx >= 53 && tx <= 55 && ty >= 17 && ty <= 25);
+      }
+      function nearPoint(tx, ty, x, y, radius) {
+        return Math.abs(tx - x) <= radius && Math.abs(ty - y) <= radius;
+      }
+      for (let y = 2; y < WORLD_ROWS - 2; y++) {
+        for (let x = 2; x < WORLD_COLS - 2; x++) {
+          if (inPath(x, y) || (x < 10 && y > 13 && y < 21) || nearPoint(x,y,16,21,2) || nearPoint(x,y,32,27,2) || nearPoint(x,y,46,20,2)) continue;
+          if (hash(x,y) > .89) trees.push({ x, y, kind: hash(x+91,y+37) > .5 ? "tree" : "bush" });
+        }
+      }
+
+      function showToast(text, seconds = 1.5) {
+        const toast = document.getElementById("toast");
+        toast.textContent = text;
+        toast.classList.add("visible");
+        game.toastTime = seconds;
+      }
+      function solidAt(px, py) {
+        if (px < 10 || py < 10 || px > WORLD_W - 20 || py > WORLD_H - 20) return true;
+        const tx = Math.floor(px / TILE), ty = Math.floor(py / TILE);
+        for (const pond of ponds) {
+          if (tx >= pond.x && tx < pond.x + pond.w && ty >= pond.y && ty < pond.y + pond.h) return true;
+        }
+        for (const prop of trees) {
+          if (tx === prop.x && ty === prop.y && prop.kind === "tree") return true;
+        }
+        for (const cabin of cabins) {
+          if (px >= cabin.x*TILE && px < (cabin.x+4)*TILE && py >= (cabin.y+1)*TILE && py < (cabin.y+4)*TILE) return true;
+        }
+        return false;
+      }
+      function collides(x, y) {
+        const pad = 2;
+        return solidAt(x + pad, y + player.h - 2) || solidAt(x + player.w - pad, y + player.h - 2) ||
+          solidAt(x + pad, y + 2) || solidAt(x + player.w - pad, y + 2);
+      }
+      function drawGround(tx, ty, sx, sy) {
+        const n = hash(tx, ty);
+        ctx.fillStyle = n > .86 ? "#73c367" : n < .1 ? "#69b85e" : "#79c96b";
+        ctx.fillRect(sx, sy, TILE, TILE);
+        if (inPath(tx, ty)) {
+          ctx.fillStyle = hash(tx + 13, ty + 6) > .48 ? "#bd9a5c" : "#c7a96b";
+          ctx.fillRect(sx, sy, TILE, TILE);
+          ctx.fillStyle = "rgba(113,79,49,.22)";
+          if (hash(tx+4,ty+8) > .55) ctx.fillRect(sx+3,sy+5,3,2);
+          if (hash(tx+9,ty+2) > .68) ctx.fillRect(sx+11,sy+11,2,2);
+        } else if (n > .72) {
+          ctx.fillStyle = "#4e9e56";
+          ctx.fillRect(sx+4,sy+11,2,3);
+          ctx.fillRect(sx+11,sy+5,2,2);
+        } else if (n < .17) {
+          ctx.fillStyle = "#f0dd88";
+          ctx.fillRect(sx+6,sy+4,2,2);
+          ctx.fillRect(sx+5,sy+7,4,2);
+          ctx.fillStyle = "#ecf0bc";
+          ctx.fillRect(sx+6,sy+7,2,2);
+        }
+      }
+      function drawPond(pond, sx, sy) {
+        ctx.fillStyle = "#387f83";
+        ctx.fillRect(sx-2,sy-2,pond.w*TILE+4,pond.h*TILE+4);
+        ctx.fillStyle = "#4aa5a2";
+        ctx.fillRect(sx,sy,pond.w*TILE,pond.h*TILE);
+        ctx.fillStyle = "#82d0bd";
+        for (let i = 0; i < 5; i++) {
+          const x = sx + 8 + ((i*37 + Math.floor(game.time*9)) % Math.max(12,pond.w*TILE-14));
+          const y = sy + 7 + ((i*19) % Math.max(12,pond.h*TILE-14));
+          ctx.fillRect(x,y,5,2);
+        }
+        ctx.fillStyle = "#d8d28d";
+        for (let i = 0; i < pond.w; i += 2) ctx.fillRect(sx+i*TILE+3,sy-1,5,3);
+      }
+      function drawTree(x, y, kind) {
+        const sx = Math.round(x*TILE - view.x), sy = Math.round(y*TILE - view.y);
+        if (kind === "bush") {
+          ctx.fillStyle = "#488147";
+          ctx.fillRect(sx+2,sy+7,12,8);
+          ctx.fillStyle = "#429548";
+          ctx.fillRect(sx+1,sy+4,6,8);
+          ctx.fillRect(sx+8,sy+3,7,9);
+          ctx.fillStyle = "#7dc65a";
+          ctx.fillRect(sx+3,sy+5,3,2);
+          ctx.fillRect(sx+10,sy+4,2,2);
+        } else {
+          ctx.fillStyle = "#51613c";
+          ctx.fillRect(sx+5,sy+9,7,7);
+          ctx.fillStyle = "#24653f";
+          ctx.fillRect(sx+1,sy+4,14,10);
+          ctx.fillRect(sx+3,sy+1,10,12);
+          ctx.fillStyle = "#398c4e";
+          ctx.fillRect(sx+4,sy+2,6,5);
+          ctx.fillRect(sx+2,sy+6,4,3);
+          ctx.fillStyle = "#a1d56a";
+          ctx.fillRect(sx+5,sy+3,3,2);
+        }
+      }
+      function drawCabin(cabin) {
+        const x = cabin.x*TILE-view.x, y = cabin.y*TILE-view.y;
+        ctx.fillStyle = "#68563f";
+        ctx.fillRect(x+2,y+13,60,49);
+        ctx.fillStyle = "#dbb978";
+        ctx.fillRect(x+7,y+18,50,42);
+        ctx.fillStyle = "#9c5844";
+        ctx.fillRect(x,y+10,64,12);
+        ctx.fillRect(x+5,y+4,54,10);
+        ctx.fillRect(x+12,y,40,7);
+        ctx.fillStyle = "#79b9a0";
+        ctx.fillRect(x+13,y+28,10,12);
+        ctx.fillRect(x+42,y+28,10,12);
+        ctx.fillStyle = "#4a4a3b";
+        ctx.fillRect(x+27,y+38,12,22);
+        ctx.fillStyle = "#e9d18e";
+        ctx.fillRect(x+35,y+48,2,2);
+        ctx.fillStyle = "#f4edca";
+        ctx.fillRect(x+22,y+65,20,3);
+      }
+      function drawShrine() {
+        const x = 56*TILE-view.x, y = 21*TILE-view.y;
+        ctx.fillStyle = "#53615a";
+        ctx.fillRect(x,y+13,55,38);
+        ctx.fillStyle = "#817c68";
+        ctx.fillRect(x+4,y+8,47,41);
+        ctx.fillStyle = "#a7a287";
+        ctx.fillRect(x+9,y+4,38,39);
+        ctx.fillStyle = "#68716b";
+        ctx.fillRect(x+15,y+1,26,38);
+        ctx.fillStyle = "#263a3e";
+        ctx.fillRect(x+19,y+22,18,21);
+        ctx.fillStyle = relics.every(r=>r.found) ? "#f5ca63" : "#ce765b";
+        ctx.fillRect(x+16,y+17,24,5);
+        ctx.fillStyle = "#ddd7b3";
+        ctx.fillRect(x+4,y+48,47,4);
+        ctx.fillStyle = "#d1d6b6";
+        ctx.fillRect(x-2,y+54,60,3);
+      }
+      function drawRelic(relic) {
+        if (relic.found) return;
+        const x = Math.round(relic.x-view.x), y = Math.round(relic.y-view.y);
+        const bob = Math.sin(game.time*4 + relic.x)*2;
+        ctx.fillStyle = "rgba(50,76,54,.35)";
+        ctx.fillRect(x-5,y+6,10,3);
+        ctx.fillStyle = "#f7cf62";
+        ctx.fillRect(x-2,y-6+bob,4,2);
+        ctx.fillRect(x-4,y-4+bob,8,8);
+        ctx.fillRect(x-2,y+4+bob,4,2);
+        ctx.fillStyle = "#fff2ae";
+        ctx.fillRect(x-1,y-3+bob,2,5);
+        ctx.fillRect(x-3,y-1+bob,6,2);
+      }
+      function drawEnemy(enemy) {
+        if (!enemy.alive) return;
+        const x = Math.round(enemy.x-view.x), y = Math.round(enemy.y-view.y + Math.sin(game.time*5+enemy.phase)*2);
+        ctx.fillStyle = "rgba(36,67,49,.35)";
+        ctx.fillRect(x-7,y+8,15,4);
+        ctx.fillStyle = "#507d46";
+        ctx.fillRect(x-7,y+1,15,8);
+        ctx.fillRect(x-5,y-2,11,4);
+        ctx.fillStyle = "#79bd58";
+        ctx.fillRect(x-5,y,10,6);
+        ctx.fillStyle = "#edf0c8";
+        ctx.fillRect(x-3,y+2,2,3);
+        ctx.fillRect(x+2,y+2,2,3);
+        ctx.fillStyle = "#263a3e";
+        ctx.fillRect(x-2,y+3,1,2);
+        ctx.fillRect(x+3,y+3,1,2);
+      }
+      function drawPlayer() {
+        const x = Math.round(player.x-view.x), y = Math.round(player.y-view.y);
+        if (player.invulnerable > 0 && Math.floor(game.time*14)%2) return;
+        ctx.fillStyle = "rgba(32,61,45,.32)";
+        ctx.fillRect(x-2,y+11,15,4);
+        ctx.fillStyle = "#275eaa";
+        ctx.fillRect(x+1,y+4,10,7);
+        ctx.fillStyle = "#397fce";
+        ctx.fillRect(x+2,y+2,9,7);
+        ctx.fillStyle = "#d5a277";
+        ctx.fillRect(x+3,y,7,5);
+        ctx.fillStyle = "#e7c58c";
+        ctx.fillRect(x+4,y+1,6,4);
+        ctx.fillStyle = "#283d50";
+        ctx.fillRect(x+8,y+2,2,2);
+        ctx.fillStyle = "#d57959";
+        ctx.fillRect(x+2,y+7,8,2);
+        ctx.fillStyle = "#e9dfbd";
+        ctx.fillRect(x+1,y+11,4,2);
+        ctx.fillRect(x+8,y+11,4,2);
+        if (player.attack > 0) {
+          ctx.fillStyle = "#f3e9d1";
+          if (player.face === "right") ctx.fillRect(x+12,y+3,3,11);
+          else if (player.face === "left") ctx.fillRect(x-5,y+3,3,11);
+          else if (player.face === "up") ctx.fillRect(x+4,y-5,3,4);
+          else ctx.fillRect(x+5,y+13,3,4);
+          ctx.fillStyle = "#f0ca65";
+          if (player.face === "right") ctx.fillRect(x+13,y+2,2,3);
+          else if (player.face === "left") ctx.fillRect(x-5,y+2,2,3);
+          else if (player.face === "up") ctx.fillRect(x+3,y-6,4,2);
+          else ctx.fillRect(x+4,y+15,4,2);
+        }
+      }
+      function drawWorld() {
+        const startX = Math.max(0,Math.floor(view.x/TILE));
+        const startY = Math.max(0,Math.floor(view.y/TILE));
+        const endX = Math.min(WORLD_COLS,startX+Math.ceil(canvas.width/TILE)+2);
+        const endY = Math.min(WORLD_ROWS,startY+Math.ceil(canvas.height/TILE)+2);
+        for (let ty=startY; ty<endY; ty++) for (let tx=startX; tx<endX; tx++) drawGround(tx,ty,Math.floor(tx*TILE-view.x),Math.floor(ty*TILE-view.y));
+        for (const pond of ponds) drawPond(pond,Math.floor(pond.x*TILE-view.x),Math.floor(pond.y*TILE-view.y));
+        for (const cabin of cabins) drawCabin(cabin);
+        drawShrine();
+        for (const prop of trees) drawTree(prop.x,prop.y,prop.kind);
+        for (const relic of relics) drawRelic(relic);
+        for (const enemy of enemies) drawEnemy(enemy);
+        drawPlayer();
+        ctx.fillStyle = "#344e49";
+        ctx.fillRect(0,0,canvas.width,2);
+        ctx.fillRect(0,canvas.height-2,canvas.width,2);
+        ctx.fillRect(0,0,2,canvas.height);
+        ctx.fillRect(canvas.width-2,0,2,canvas.height);
+      }
+      function attack() {
+        if (game.won || game.over || player.attackCooldown > 0) return;
+        player.attack = .18;
+        player.attackCooldown = .34;
+        const vectors = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] };
+        const [dx,dy] = vectors[player.face];
+        let hitSomething = false;
+        for (const enemy of enemies) {
+          if (!enemy.alive) continue;
+          const ex = enemy.x+7-player.x-player.w/2;
+          const ey = enemy.y+7-player.y-player.h/2;
+          const forward = ex*dx+ey*dy;
+          const side = Math.abs(ex*dy-ey*dx);
+          if (forward > -4 && forward < 27 && side < 19) {
+            enemy.hp--;
+            enemy.x += dx*9;
+            enemy.y += dy*9;
+            hitSomething = true;
+            if (enemy.hp <= 0) {
+              enemy.alive = false;
+              game.score += 150;
+              showToast("Forest spirit dispersed",.8);
+            }
+          }
+        }
+        if (hitSomething) game.score += 25;
+        updateHud();
+      }
+      function interact() {
+        if (game.won || game.over) return;
+        const dx = 56*TILE-player.x;
+        const dy = 23*TILE-player.y;
+        if (Math.abs(dx) < 34 && Math.abs(dy) < 48) {
+          if (relics.every(relic=>relic.found)) {
+            game.score += 1000;
+            if (game.score > best) {
+              best = game.score;
+              localStorage.setItem("starfall-vale-best",String(best));
+              document.getElementById("best").textContent = best;
+            }
+            game.won = true;
+            document.getElementById("end-title").textContent = "Vale restored";
+            document.getElementById("end-copy").textContent = "The star shrine shines again. The valley is yours to explore.";
+            document.getElementById("play-again").textContent = "PLAY AGAIN";
+            document.getElementById("end-panel").hidden = false;
+          } else showToast("The shrine needs all three star shards",2);
+        } else showToast("The shrine is farther east",1.2);
+      }
+      function updateHud() {
+        document.getElementById("hearts").textContent = "♥ ".repeat(game.hearts).trim() || "—";
+        document.getElementById("shards").textContent = `${relics.filter(r=>r.found).length} / 3`;
+        document.getElementById("score").textContent = game.score;
+      }
+      function update(dt) {
+        if (game.won || game.over) return;
+        game.time += dt;
+        game.toastTime = Math.max(0,game.toastTime-dt);
+        if (!game.toastTime) document.getElementById("toast").classList.remove("visible");
+        player.attack = Math.max(0,player.attack-dt);
+        player.attackCooldown = Math.max(0,player.attackCooldown-dt);
+        player.invulnerable = Math.max(0,player.invulnerable-dt);
+        let vx = Number(held.right || keys.has("ArrowRight") || keys.has("KeyD")) - Number(held.left || keys.has("ArrowLeft") || keys.has("KeyA"));
+        let vy = Number(held.down || keys.has("ArrowDown") || keys.has("KeyS")) - Number(held.up || keys.has("ArrowUp") || keys.has("KeyW"));
+        const length = Math.hypot(vx,vy) || 1;
+        vx /= length;
+        vy /= length;
+        if (Math.abs(vx)>Math.abs(vy) && vx) player.face=vx>0?"right":"left";
+        else if (vy) player.face=vy>0?"down":"up";
+        const nextX=player.x+vx*player.speed*dt;
+        const nextY=player.y+vy*player.speed*dt;
+        if (!collides(nextX,player.y)) player.x=nextX;
+        if (!collides(player.x,nextY)) player.y=nextY;
+
+        for (const relic of relics) {
+          if (!relic.found && Math.hypot(player.x+player.w/2-relic.x,player.y+player.h/2-relic.y)<15) {
+            relic.found=true;
+            game.score+=300;
+            showToast("Star shard found!",1.3);
+            updateHud();
+          }
+        }
+        for (const enemy of enemies) {
+          if (!enemy.alive) continue;
+          const dx=player.x-enemy.x, dy=player.y-enemy.y, distance=Math.hypot(dx,dy);
+          if (distance<86 && distance>1) {
+            const step=25*dt;
+            const nx=enemy.x+dx/distance*step, ny=enemy.y+dy/distance*step;
+            if (!solidAt(nx+5,ny+12)) enemy.x=nx;
+            if (!solidAt(enemy.x+5,ny+12)) enemy.y=ny;
+          }
+          if (distance<15 && player.invulnerable<=0) {
+            game.hearts--;
+            player.invulnerable=1.15;
+            player.x=Math.max(12,player.x+(dx===0?0:Math.sign(dx)*18));
+            player.y=Math.max(12,player.y+(dy===0?0:Math.sign(dy)*18));
+            showToast(game.hearts?"Ouch! Watch your hearts":"The forest grew quiet...",1.2);
+            updateHud();
+            if (game.hearts<=0) {
+              game.over=true;
+              document.getElementById("end-title").textContent="Journey ended";
+              document.getElementById("end-copy").textContent="The valley will be here when you are ready to return.";
+              document.getElementById("play-again").textContent="TRY AGAIN";
+              document.getElementById("end-panel").hidden=false;
+            }
+          }
+        }
+        const shrineX=56*TILE;
+        if (player.x>shrineX && !(relics.every(r=>r.found) && Math.abs(player.y-23*TILE)<38)) {
+          player.x=shrineX;
+          if (!relics.every(r=>r.found) && game.time%2<dt) showToast("The shrine seal is closed",1);
+        } else if (player.x>shrineX+20 && relics.every(r=>r.found)) {
+          player.x=shrineX+20;
+          showToast("Press USE at the shrine",1);
+        }
+        view.x=Math.max(0,Math.min(WORLD_W-canvas.width,player.x+player.w/2-canvas.width/2));
+        view.y=Math.max(0,Math.min(WORLD_H-canvas.height,player.y+player.h/2-canvas.height/2));
+      }
+      function loop() {
+        const dt=Math.min(.04,(performance.now()-lastFrame)/1000);
+        lastFrame=performance.now();
+        update(dt);
+        drawWorld();
+        requestAnimationFrame(loop);
+      }
+      let lastFrame=performance.now();
+      window.addEventListener("keydown",event=>{
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(event.code)) event.preventDefault();
+        keys.add(event.code);
+        if (!event.repeat && (event.code==="KeyZ" || event.code==="Space")) attack();
+        if (!event.repeat && (event.code==="KeyE" || event.code==="Enter")) interact();
+        if (!event.repeat && event.code==="KeyR") reset();
+      });
+      window.addEventListener("keyup",event=>keys.delete(event.code));
+      window.addEventListener("blur",()=>{ keys.clear(); for (const key of Object.keys(held)) held[key]=false; });
+      for (const button of document.querySelectorAll("[data-hold]")) {
+        const direction=button.dataset.hold;
+        button.addEventListener("pointerdown",event=>{
+          event.preventDefault();
+          button.setPointerCapture(event.pointerId);
+          held[direction]=true;
+          button.classList.add("held");
+        });
+        const release=()=>{ held[direction]=false; button.classList.remove("held"); };
+        button.addEventListener("pointerup",release);
+        button.addEventListener("pointercancel",release);
+        button.addEventListener("lostpointercapture",release);
+      }
+      document.getElementById("attack").addEventListener("pointerdown",event=>{ event.preventDefault(); attack(); });
+      document.getElementById("interact").addEventListener("pointerdown",event=>{ event.preventDefault(); interact(); });
+      document.getElementById("play-again").addEventListener("click",()=>location.reload());
+      updateHud();
+      loop();
+    })();
+  </script>
+</body>
+</html>
